@@ -1,0 +1,54 @@
+DECLARE @DbName NVARCHAR(128), @Sql NVARCHAR(MAX)
+
+-- Cursor to loop through all user databases
+DECLARE DbCursor CURSOR FOR 
+SELECT name 
+FROM sys.databases
+WHERE state_desc = 'ONLINE' AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
+
+-- Table to hold combined results
+SET @Sql = ''
+
+OPEN DbCursor
+
+FETCH NEXT FROM DbCursor INTO @DbName
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @Sql = @Sql + '
+    SELECT 
+        ''' + @DbName + ''' COLLATE DATABASE_DEFAULT AS DatabaseName,
+        sch.name COLLATE DATABASE_DEFAULT AS SchemaName,
+        t.name COLLATE DATABASE_DEFAULT AS TableName,
+        i.name COLLATE DATABASE_DEFAULT AS IndexName,
+        CASE
+            WHEN i.type = 1 THEN ''Clustered''
+            WHEN i.type = 2 THEN ''Non-clustered''
+            WHEN i.type = 3 THEN ''XML''
+            WHEN i.type = 4 THEN ''Spatial''
+            ELSE ''Heap''
+        END AS IndexType,
+        s.avg_fragmentation_in_percent AS AvgFragmentationPercent,
+        s.fragment_count AS FragmentCount,
+        s.page_count AS PageCount
+    FROM [' + @DbName + '].sys.dm_db_index_physical_stats(DB_ID(''' + @DbName + '''), NULL, NULL, NULL, ''SAMPLED'') s
+    INNER JOIN [' + @DbName + '].sys.indexes i ON s.object_id = i.object_id AND s.index_id = i.index_id
+    INNER JOIN [' + @DbName + '].sys.tables t ON i.object_id = t.object_id
+    INNER JOIN [' + @DbName + '].sys.schemas sch ON t.schema_id = sch.schema_id
+    WHERE s.index_id > 0
+    UNION ALL'
+    
+    FETCH NEXT FROM DbCursor INTO @DbName
+END
+
+CLOSE DbCursor
+DEALLOCATE DbCursor
+
+-- Remove the trailing UNION ALL
+SET @Sql = LEFT(@Sql, LEN(@Sql) - 10)
+
+-- Add the ORDER BY clause
+SET @Sql = @Sql + ' ORDER BY AvgFragmentationPercent DESC'
+
+-- Execute the dynamic SQL
+EXEC sp_executesql @Sql
