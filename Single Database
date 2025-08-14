@@ -10,5 +10,6 @@ INNER JOIN sys.indexes I ON I.object_id = DDIPS.object_id
 AND DDIPS.index_id = I.index_id
 WHERE DDIPS.database_id = DB_ID()
 and I.name is not null
-AND DDIPS.avg_fragmentation_in_percent > 0
-ORDER BY DDIPS.avg_fragmentation_in_percent desc
+AND DDIPS.avg_fragmentation_in_percent > 30
+and page_count > 1000
+ORDER BY DDIPS.avg_fragmentation_in_percent DESC, page_count DESC 
