@@ -1,0 +1,25 @@
+SELECT
+  s.name  AS SchemaName,
+  o.name  AS TableName,
+  i.name  AS IndexName,
+  ips.index_id,
+  ips.partition_number,
+  ips.alloc_unit_type_desc,      
+  ips.page_count,
+  ips.avg_fragmentation_in_percent
+FROM sys.dm_db_index_physical_stats(
+
+
+
+       DB_ID(), OBJECT_ID('dbo.EmployeeInfo'), NULL, NULL, 'DETAILED') AS ips
+
+
+
+JOIN sys.indexes  AS i ON i.object_id = ips.object_id AND i.index_id = ips.index_id
+JOIN sys.objects  AS o ON o.object_id = ips.object_id
+JOIN sys.schemas  AS s ON s.schema_id = o.schema_id
+
+
+WHERE i.name = 'PK_EmployeeInfo'
+
+ORDER BY ips.index_id, ips.partition_number, ips.alloc_unit_type_desc;
